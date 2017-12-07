@@ -6,9 +6,9 @@ function set-user() {
 	if [ -f $dir/user ]; then
 		user=$(cat $dir/user)
 	else
-		read -p "Enter your Github username: " user
+		read -p "Enter a Github username: " user
 	fi
-	read -p "Is your username $user? (y/n) " -n 1 -r
+	read -p "Is $user correct? (y/n) " -n 1 -r
 	echo
 	if [[ $REPLY =~ ^[Yy]$ ]]; then
 		echo "$user" > $dir/user
@@ -18,6 +18,8 @@ function set-user() {
 	fi
 }
 
+# Get an authentication token for the user's Github acount
+# Unused in the final version
 function set-token() {
 	if [ -f $dir/token-$user ]; then
 		token=$(cat $dir/token-$user )
@@ -36,5 +38,5 @@ function set-token() {
 
 mkdir -p $dir
 set-user
-set-token
-curl https://api.github.com/user/repos?access_token=$token
+repos=$(curl https://api.github.com/users/$user/repos?type=owner | jq 'sort_by(.created_at)')
+
