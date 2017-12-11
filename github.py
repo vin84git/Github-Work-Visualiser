@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 import click
+import dateutil.parser
 import json
 import os
 import pprint
+import re
 import requests
 import sys
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -34,14 +37,28 @@ def cached(path):
         pass
     return res
 
-def gib(url):
-    r = requests.get(url, params={"access_token": token})
-    return r.json()
+def gib(url, params=dict()):
+    params["access_token"] = token
+    r = requests.get(url, params=params)
+    res = r.json()
+    if "Link" in r.headers:
+        link = r.headers["Link"]
+        for l in link.split(","):
+            if re.search('rel=.next.', l) != None:
+                res += gib(re.search('^<(.*)>', l).group(1))
+    return res
 
 def repo_name_arr(data):
     if not isinstance(data, list):
         return None
     return list(map(lambda d: d["name"], data))
+
+def format_commits(user, repo, data):
+    res = []
+    for commit in data:
+        ds = commit["commit"]["author"]["date"]
+        res.append({"repo": repo, "date": ds})
+    return res
 
 def get_commits_thread(use_cached, user, repo):
     #  print("Thread spun up for {}/{}".format(user, repo))
@@ -58,6 +75,7 @@ def get_commits_thread(use_cached, user, repo):
         if data == None or "message" in data:
             sys.stderr.write("Warning! Couldn't fetch commit history for {}/{}\n"
                     .format(user, repo))
+        data = format_commits(user, repo, data)
         with open(repo_path, 'w') as outfile:
             json.dump(data, outfile)
     return data
@@ -71,8 +89,8 @@ def collect_commits(bar, user, data, repo, future):
     #  sys.stderr.write("repo\n")
     commits = future.result()
     for commit in commits:
-        commit["repo"] = repo
-    data.append(commits)
+        commit["date"] = dateutil.parser.parse(commit["date"])
+    data += commits
     bar.update(1)
 
 def login():
@@ -88,7 +106,7 @@ def login():
         token_data = requests.post("https://api.github.com/authorizations",
                 auth=(user,password),
                 json={"scopes":["repo", "gist"],"note":"shephero-github-v1"}).json()
-        if not token in token_data:
+        if not "token" in token_data:
             sys.stderr.write("Unable to authenticate with Github")
             sys.exit(0)
         with open(token_path, "w") as f:
@@ -97,10 +115,11 @@ def login():
 
 def fetch_repo_names(user, path):
     print("Downloading list of repositories...")
-    repos = gib(api["repos"].format(user))
+    repos = gib(api["repos"].format(user), params={"type": "owner"})
+    repos = list(filter(lambda a: not a["fork"], repos))
     repo_names = repo_name_arr(repos)
     if repo_names == None:
-        print("Cannot get repository list for user:", target, file=sys.stderr)
+        print("Cannot get repository list for user:", user, file=sys.stderr)
         sys.stderr.write(json.dumps(repos) + "\n")
         return 1
     with open(path, 'w') as outfile:
@@ -131,12 +150,26 @@ def get_commits():
                 future = pool.submit(get_commits_thread, use_cached, target, repo)
                 future.add_done_callback(
                         partial(collect_commits, bar, target, data, repo))
-    return [item for sublist in data for item in sublist]
+    return data
+
+def graph(keys, counts, totals):
+    
+
+def time_graph(commits):
+    commits = sorted(commits, key=lambda a: a["date"])
+    repo_commits = map(lambda d: d["repo"], commits)
+    total_count = Counter(repo_commits)
+    repos = set(repo_commits)
+    for i, c in enumerate(commit):
+        count = Counter(repo_commits[0:i])
+        graph(repos, count, total_count)
 
 def start():
     login()
-    data = get_commits()
-    print(data)
+    commits = get_commits()
+    with open("data.json", "w") as f:
+        json.dump(list(map(lambda a: a["repo"], commits)), f)
+    time_graph(commits)
 
 if __name__ == "__main__":
     start()
