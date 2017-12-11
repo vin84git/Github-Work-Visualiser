@@ -3,11 +3,13 @@
 import click
 import dateutil.parser
 import json
+import math
 import os
 import pprint
 import re
 import requests
 import sys
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -152,17 +154,37 @@ def get_commits():
                         partial(collect_commits, bar, target, data, repo))
     return data
 
-def graph(keys, counts, totals):
-    
+def blank_mat(x, y):
+    return [[' ' for x in range(w)] for y in range(h)]
+
+def graph(keys, counts, totals, maxim):
+    #  canvas = blank_mat(60, len(keys))
+    res = ""
+    for key in keys:
+        k = key
+        if len(key) > 14:
+            k = k[:11] + "..."
+        elif len(k) < 14:
+            k += (14 - len(k)) * " "
+        res += k + " |"
+        res += math.ceil(counts[key] / maxim * 60) * "-"
+        res += "\n"
+    return res
 
 def time_graph(commits):
     commits = sorted(commits, key=lambda a: a["date"])
-    repo_commits = map(lambda d: d["repo"], commits)
+    repo_commits = list(map(lambda d: d["repo"], commits))
     total_count = Counter(repo_commits)
     repos = set(repo_commits)
-    for i, c in enumerate(commit):
+    maxim = total_count.most_common(1)[0][1]
+    for i, c in enumerate(commits):
         count = Counter(repo_commits[0:i])
-        graph(repos, count, total_count)
+        g = graph(repos, count, total_count, maxim)
+        click.clear()
+        print(g)
+        print("\n" + c["date"].strftime('%Y-%m-%d'))
+        print("\n\n\n")
+        time.sleep(0.05)
 
 def start():
     login()
