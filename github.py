@@ -31,6 +31,12 @@ api["repos"] = api["users"] + "/{}/repos"
 api["commits"] = api["base"] + "/repos/{}/{}/commits"
 token = None
 
+fill_char = '|'
+hor_char = '-'
+vert_char = '|'
+tr_char = '+'
+br_char = '+'
+
 def cached(path):
     res = None
     try:
@@ -134,6 +140,7 @@ def get_commits():
     with open(target_path, "w") as f:
         json.dump(target, f)
     user_dir = os.path.join(data_dir, target)
+    os.makedirs(user_dir, exist_ok=True)
     repos_path = os.path.join(user_dir, "repos.json")
     repos = cached(repos_path)
     repo_names = repos
@@ -144,7 +151,6 @@ def get_commits():
         repo_names = fetch_repo_names(target, repos_path)
     pp.pprint(repo_names)
     data = []
-    print("Starting multithreaded commit fetcher...")
     with click.progressbar(length=len(repo_names),
                        label="Downloading commits") as bar:
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -159,16 +165,17 @@ def blank_mat(x, y):
 
 def graph(keys, counts, totals, maxim):
     #  canvas = blank_mat(60, len(keys))
-    res = ""
+    res = (hor_char * 15) + tr_char + "\n"
     for key in keys:
         k = key
         if len(key) > 14:
             k = k[:11] + "..."
         elif len(k) < 14:
             k += (14 - len(k)) * " "
-        res += k + " |"
-        res += math.ceil(counts[key] / maxim * 60) * "-"
+        res += k + " " + vert_char
+        res += math.ceil(counts[key] / maxim * 60) * fill_char
         res += "\n"
+    res += hor_char * 15 + br_char
     return res
 
 def time_graph(commits):
@@ -186,7 +193,20 @@ def time_graph(commits):
         print("\n\n\n")
         time.sleep(0.05)
 
-def start():
+@click.command()
+@click.option('--fancy/--no-fancy', default=False)
+def start(fancy):
+    global fill_char
+    global vert_char
+    global hor_char
+    global br_char
+    global tr_char
+    if fancy:
+        fill_char = '▇'
+        hor_char = '━'
+        vert_char = '┃'
+        tr_char = '┓'
+        br_char = '┛'
     login()
     commits = get_commits()
     with open("data.json", "w") as f:
