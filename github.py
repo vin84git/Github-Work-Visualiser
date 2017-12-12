@@ -8,6 +8,7 @@ import os
 import pprint
 import re
 import requests
+import subprocess
 import sys
 import time
 from collections import Counter
@@ -182,7 +183,7 @@ def time_graph(commits):
     commits = sorted(commits, key=lambda a: a["date"])
     repo_commits = list(map(lambda d: d["repo"], commits))
     total_count = Counter(repo_commits)
-    repos = set(repo_commits)
+    repos = set(sorted(repo_commits))
     maxim = total_count.most_common(1)[0][1]
     for i, c in enumerate(commits):
         count = Counter(repo_commits[0:i])
@@ -190,7 +191,7 @@ def time_graph(commits):
         click.clear()
         print(g)
         print("\n" + c["date"].strftime('%Y-%m-%d'))
-        print("\n\n\n")
+        #  subprocess.run(["scrot", "-u", "./scr/{0:05d}.png".format(i)])
         time.sleep(0.05)
 
 @click.command()
