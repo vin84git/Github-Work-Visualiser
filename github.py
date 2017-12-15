@@ -14,6 +14,7 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from getpass import getpass
 
 home = os.path.expanduser("~")
 base_dir = os.path.join(home, ".github", "shephero")
